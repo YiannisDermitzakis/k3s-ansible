@@ -10,22 +10,62 @@
     - k3s-node
     - k3s-init
 
-- name: RUN pkill -9 -f "k3s/data/[^/]+/bin/containerd-shim-runc"
-  register: pkill_containerd_shim_runc
-  command: pkill -9 -f "k3s/data/[^/]+/bin/containerd-shim-runc"
-  changed_when: "pkill_containerd_shim_runc.rc == 0"
+# Add more comprehensive pkill commands
+- name: Forcefully kill remaining K3s server/agent processes
+  command: pkill -9 -f "k3s (server|agent)"
+  changed_when: false # We don't care if it killed anything, just that it ran
+  failed_when: false # Ignore errors if no process is found
+
+- name: Forcefully kill remaining kubelet processes
+  command: pkill -9 -f "kubelet"
+  changed_when: false
   failed_when: false
+
+- name: Forcefully kill remaining containerd-shim processes
+  command: pkill -9 -f "containerd-shim-runc"
+  changed_when: false
+  failed_when: false
+
+- name: Forcefully kill remaining containerd processes
+  command: pkill -9 -f "containerd"
+  changed_when: false
+  failed_when: false
+
+# Optional: Add a small delay to allow processes to terminate
+- name: Pause for 2 seconds after killing processes
+  pause:
+    seconds: 2
+
+- name: Make sure lsof is installed
+  package:
+    name: lsof
+    state: present
+  register: lsof_installed
+
+# Add task to find and kill processes locking the target directory
+- name: Find processes locking /var/lib/kubelet/*
+  shell: "lsof +D /var/lib/kubelet | awk 'NR>1 {print $2}' | sort -u"
+  register: locking_pids
+  changed_when: locking_pids.stdout_lines | length > 0
+  failed_when: false # Don't fail if lsof isn't installed or finds nothing
+  ignore_errors: true # Continue even if lsof fails
+
+- name: Kill processes locking /var/lib/kubelet/*
+  command: "kill -9 {{ item }}"
+  with_items: "{{ locking_pids.stdout_lines | default([]) }}" # Use default filter in case stdout is empty
+  failed_when: false # Ignore errors if process is already gone
+  when: locking_pids.stdout_lines is defined and locking_pids.stdout_lines | length > 0
 
 - name: Umount k3s filesystems
   include_tasks: umount_with_children.yml
   with_items:
+    - /var/lib/kubelet/pods
+    - /var/lib/kubelet/plugins
+    - /run/netns/cni-
     - /run/k3s
     - /var/lib/kubelet
     - /run/netns
     - /var/lib/rancher/k3s
-    - /var/lib/kubelet/pods
-    - /var/lib/kubelet/plugins
-    - /run/netns/cni-
   loop_control:
     loop_var: mounted_fs
 
@@ -46,6 +86,10 @@
     - /var/lib/rancher/
     - /var/lib/cni/
     - /etc/cni/net.d
+  register: file_removal_result
+  until: file_removal_result is succeeded # Retry loop based on task success
+  retries: 5                       # Number of retries
+  delay: 5                         # Seconds to wait between retries
 
 - name: Remove K3s http_proxy files
   file:

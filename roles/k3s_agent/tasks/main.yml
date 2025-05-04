@@ -15,6 +15,35 @@
 - name: Enable and check K3s service
   systemd:
     name: k3s-node
+    state: stopped
+
+# Find and kill any lingering k3s-agent processes holding ports
+- name: Find lingering k3s-agent PIDs listening on ports
+  ansible.builtin.shell:
+    # Use ss to find listening sockets (-l), show TCP (-t) and UDP (-u),
+    # don't resolve names (-n), show process (-p).
+    # Grep for k3s-agent, extract PID, get unique PIDs.
+    cmd: "ss -tulnp | grep -E 'k3s-agent' | grep -oP 'pid=\\K\\d+' | sort -u"
+    # warn: false # Hide warnings about using shell module
+  register: k3s_agent_pids_output
+  changed_when: false
+  become: true # ss and kill require privileges
+  ignore_errors: true # Continue if ss/grep fails or finds nothing
+
+- name: Kill lingering k3s-agent PIDs
+  ansible.builtin.shell:
+    cmd: "kill -9 {{ item }}"
+    # warn: false
+  loop: "{{ k3s_agent_pids_output.stdout_lines | default([]) }}" # Loop through found PIDs, default to empty list if none found
+  when: k3s_agent_pids_output.stdout_lines is defined and k3s_agent_pids_output.stdout_lines | length > 0
+  # become: true
+  ignore_errors: true # Ignore if PID is already gone between find and kill steps
+  loop_control:
+    label: "Killing lingering k3s-agent PID {{ item }}"
+
+- name: Enable and check K3s service
+  systemd:
+    name: k3s-node
     daemon_reload: true
-    state: restarted
+    state: started
     enabled: true
