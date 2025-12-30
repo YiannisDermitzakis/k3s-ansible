@@ -108,24 +108,24 @@
 
 - name: Create directory .kube
   file:
-    path: "{{ ansible_user_dir }}/.kube"
+    path: "{{ ansible_facts['user_dir'] }}/.kube"
     state: directory
-    owner: "{{ ansible_user_id }}"
+    owner: "{{ ansible_facts['user_id'] }}"
     mode: "u=rwx,g=rx,o="
 
 - name: Copy config file to user home directory
   copy:
     src: /etc/rancher/k3s/k3s.yaml
-    dest: "{{ ansible_user_dir }}/.kube/config"
+    dest: "{{ ansible_facts['user_dir'] }}/.kube/config"
     remote_src: true
-    owner: "{{ ansible_user_id }}"
+    owner: "{{ ansible_facts['user_id'] }}"
     mode: "u=rw,g=,o="
 
 - name: Configure kubectl cluster to {{ endpoint_url }}
   command: >-
     k3s kubectl config set-cluster default
       --server={{ endpoint_url }}
-      --kubeconfig {{ ansible_user_dir }}/.kube/config
+      --kubeconfig {{ ansible_facts['user_dir'] }}/.kube/config
   changed_when: true
   vars:
     endpoint_url: >-

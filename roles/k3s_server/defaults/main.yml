@@ -10,7 +10,7 @@ group_name_master: master
 # yamllint disable rule:line-length
 server_init_args: >-
   {% if groups[group_name_master | default('master')] | length > 1 %}
-    {% if ansible_hostname == hostvars[groups[group_name_master | default('master')][0]]['ansible_hostname'] %}
+    {% if ansible_facts['hostname'] == hostvars[groups[group_name_master | default('master')][0]]['ansible_facts['hostname']'] %}
       --cluster-init
     {% else %}
       --server https://{{ hostvars[groups[group_name_master | default('master')][0]].k3s_node_ip | split(",") | first | ansible.utils.ipwrap }}:6443

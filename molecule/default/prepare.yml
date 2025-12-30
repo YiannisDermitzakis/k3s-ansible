@@ -7,7 +7,7 @@
   hosts: all
   tasks:
     - name: Disable firewalld
-      when: ansible_distribution == "Rocky"
+      when: ansible_facts['distribution'] == "Rocky"
       # Rocky Linux comes with firewalld enabled. It blocks some of the network
       # connections needed for our k3s cluster. For our test setup, we just disable
       # it since the VM host's firewall is still active for connections to and from

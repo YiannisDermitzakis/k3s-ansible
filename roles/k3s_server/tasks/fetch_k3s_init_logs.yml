@@ -22,7 +22,7 @@
   become: false
   ansible.builtin.template:
     src: content.j2
-    dest: "{{ log_destination }}/k3s-init@{{ ansible_hostname }}.log"
+    dest: "{{ log_destination }}/k3s-init@{{ ansible_facts['hostname'] }}.log"
     mode: 0644
   vars:
     content: "{{ k3s_init_log.stdout }}"

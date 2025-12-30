@@ -1,6 +1,6 @@
 ---
 - name: Deploy Calico to cluster
-  when: ansible_hostname == hostvars[groups[group_name_master | default('master')][0]]['ansible_hostname']
+  when: ansible_facts['hostname'] == hostvars[groups[group_name_master | default('master')][0]]['ansible_facts['hostname']']
   run_once: true
   block:
     - name: Create manifests directory on first master
